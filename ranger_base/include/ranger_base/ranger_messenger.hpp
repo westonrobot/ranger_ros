@@ -45,6 +45,7 @@ class RangerROSMessenger {
     double max_steer_angle_parallel;
     double max_round_angle;
     double min_turn_radius;
+    bool parking_mode;
   };
 
   enum class RangerSubType { kRanger = 0, kRangerMiniV1, kRangerMiniV2 };
