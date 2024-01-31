@@ -21,6 +21,7 @@
 #include "ranger_msgs/MotorState.h"
 #include "ranger_msgs/MotionState.h"
 #include "ranger_msgs/SystemState.h"
+#include "ranger_msgs/TriggerParkMode.h"
 
 #include "ranger_base/ranger_params.hpp"
 #include "ranger_base/kinematics_model.hpp"
@@ -134,6 +135,7 @@ void RangerROSMessenger::LoadParameters() {
       robot_params_.min_turn_radius = RangerParams::min_turn_radius;
     }
   }
+  parking_mode_ = false;
 }
 
 void RangerROSMessenger::SetupSubscription() {
@@ -151,6 +153,10 @@ void RangerROSMessenger::SetupSubscription() {
   // subscriber
   motion_cmd_sub_ = nh_->subscribe<geometry_msgs::Twist>(
       "/cmd_vel", 5, &RangerROSMessenger::TwistCmdCallback, this);
+
+  // service server
+  trigger_parking_server = nh_->advertiseService(
+      "parking_service", &RangerROSMessenger::TriggerParkingService, this);
 }
 
 void RangerROSMessenger::PublishStateToROS() {
@@ -380,7 +386,10 @@ void RangerROSMessenger::TwistCmdCallback(
   double radius;
 
   // analyze Twist msg and switch motion_mode
-  if (msg->linear.y != 0) {
+  // check for parking mode, only applicable to RangerMiniV2
+  if (parking_mode_ && robot_type_ == RangerSubType::kRangerMiniV2) {
+    return;
+  } else if (msg->linear.y != 0) {
     if (msg->linear.x == 0.0 && robot_type_ == RangerSubType::kRangerMiniV1) {
       motion_mode_ = MotionState::MOTION_MODE_SIDE_SLIP;
       robot_->SetMotionMode(MotionState::MOTION_MODE_SIDE_SLIP);
@@ -490,5 +499,26 @@ double RangerROSMessenger::ConvertCentralAngleToInner(double angle) {
                      robot_params_.track * std::sin(phi)));
   phi_i *= angle >= 0 ? 1.0 : -1.0;
   return phi_i;
+}
+
+bool RangerROSMessenger::TriggerParkingService(
+    ranger_msgs::TriggerParkMode::Request& req,
+    ranger_msgs::TriggerParkMode::Response& res) {
+  // Call to trigger park mode
+  if (req.TriggerParkedMode) {
+    res.isParked = true;
+    robot_->SetMotionCommand(0.0,
+                             0.0);  // This functions needs to be invoked before
+                                    // the parking mode can be triggered
+    robot_->SetMotionMode(MotionState::MOTION_MODE_PARKING);
+  } else {  // Call to release park mode
+    res.isParked = false;
+    robot_->SetMotionMode(MotionState::MOTION_MODE_DUAL_ACKERMAN);
+    robot_->SetMotionCommand(
+        0.0, 0.0);  // Setting the mode to dual Ackerman doesn't return the
+                    // wheels to its original position, hence this function.
+  }
+  parking_mode_ = res.isParked;
+  return true;
 }
 }  // namespace westonrobot
