@@ -286,7 +286,8 @@ void RangerROSMessenger::UpdateOdometry(double linear, double angular,
 
     boost::numeric::odeint::integrate_const(
         boost::numeric::odeint::runge_kutta4<DualAckermanModel::state_type>(),
-        DualAckermanModel(robot_params_.wheelbase, robot_params_.track, u), x, 0.0, dt, (dt / 10.0));
+        DualAckermanModel(robot_params_.wheelbase, robot_params_.track, u), x,
+        0.0, dt, (dt / 10.0));
 
     position_x_ = x[0];
     position_y_ = x[1];
@@ -342,10 +343,13 @@ void RangerROSMessenger::UpdateOdometry(double linear, double angular,
   if (motion_mode_ == MotionState::MOTION_MODE_DUAL_ACKERMAN) {
     odom_msg.twist.twist.linear.x = linear * std::cos(theta_);
     odom_msg.twist.twist.linear.y = linear * std::sin(theta_);
-    if (steering_angle == 0) odom_msg.twist.twist.angular.z = 0;
-    else odom_msg.twist.twist.angular.z = steering_angle / std::abs(steering_angle) *
-        2 * linear / (robot_params_.wheelbase / std::abs(std::tan(steering_angle)) + robot_params_.track);
-    ROS_INFO("feedback linear: %f, steering_angle: %f", linear, steering_angle);
+    if (steering_angle == 0)
+      odom_msg.twist.twist.angular.z = 0;
+    else
+      odom_msg.twist.twist.angular.z =
+          steering_angle / std::abs(steering_angle) * 2 * linear /
+          (robot_params_.wheelbase / std::abs(std::tan(steering_angle)) +
+           robot_params_.track);
   } else if (motion_mode_ == MotionState::MOTION_MODE_PARALLEL ||
              motion_mode_ == MotionState::MOTION_MODE_SIDE_SLIP) {
     double phi = steering_angle;
